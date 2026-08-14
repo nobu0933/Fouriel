@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+	<head>
+		<meta charset="UTF-8" />
+		<title>FOURIEL</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<h1>FOURIEL</h1>
+		<p>流れる波のリズムに合わせて画面を <strong>連続で一定間隔でタップ</strong> しましょう。</p>
+		<p>タップ間隔から周期を判定し、合成波からその成分を引き抜きます。</p>
+
+		<button id="nextButton">次の問題に進む</button>
+
+		<!-- キャンバスを横並びにするラッパー -->
+		<div class="canvas-wrapper">
+			<canvas id="graphCanvas" width="350" height="600"></canvas>
+			<canvas id="gameCanvas" width="800" height="600"></canvas>
+		</div>
+
+		<div id="msg"></div>
+
+		<!-- トグルボタン -->
+		<button onclick="toggleShowLine()">線の表示 ON/OFF</button>
+		<button onclick="toggleShowDot()">円の表示 ON/OFF</button>
+		<button onclick="toggleShowShip()">船の表示/非表示</button>
+
+		<label for="speedSlider">進行速度: </label>
+		<input
+			type="range"
+			id="speedSlider"
+			min="50"
+			max="800"
+			value="300"
+			oninput="setWaveSpeed(this.value)"
+		/>
+
+		<!-- 線の太さ調整スライダー -->
+		<label
+			>線の太さ:
+			<input
+				type="range"
+				min="0.5"
+				max="10"
+				step="0.5"
+				value="2.5"
+				oninput="setLineThickness(this.value)"
+		/></label>
+
+		<!-- 円の設定スライダー -->
+		<label
+			>円の間隔:
+			<input type="range" min="4" max="100" value="12" oninput="setDotSpacing(this.value)"
+		/></label>
+		<label
+			>円の半径: <input type="range" min="1" max="10" value="4" oninput="setDotRadius(this.value)"
+		/></label>
+
+		<label
+			>濃い円の間隔:
+			<input type="range" min="1" max="20" value="5" oninput="setDotAccentInterval(this.value)"
+		/></label>
+
+		<!-- JavaScriptの読み込みはbodyの最後に行います -->
+		<script src="script.js"></script>
+	</body>
+</html>
