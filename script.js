@@ -1,9 +1,70 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// グラフ用キャンバスのコンテキストを取得
 const graphCanvas = document.getElementById('graphCanvas');
 const graphCtx = graphCanvas.getContext('2d');
+
+// ★ 追加: クリアボタンが既に表示されたかどうかのフラグ
+let isClearButtonsShown = false;
+
+// ==========================================
+// ★ 修正: ウィンドウリサイズに合わせて解像度とグラフのレイアウトを更新
+// ==========================================
+// ==========================================
+// ★ 修正: ウィンドウリサイズに合わせて解像度とグラフのレイアウトを更新
+// ==========================================
+function resizeCanvas() {
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+
+	const isLandscape = window.innerWidth > window.innerHeight;
+	const graphContainer = document.getElementById('graph-container'); // ★ 追加
+
+	if (isLandscape) {
+		let gWidth = Math.max(300, Math.min(450, window.innerWidth * 0.25));
+		let gHeight = gWidth * 0.75;
+
+		// 解像度はキャンバスに設定
+		graphCanvas.width = gWidth;
+		graphCanvas.height = gHeight;
+
+		// ★ 修正: 配置や枠線はコンテナに設定する
+		if (graphContainer) {
+			graphContainer.style.width = gWidth + 'px';
+			graphContainer.style.height = gHeight + 'px';
+			graphContainer.style.top = 'auto';
+			graphContainer.style.bottom = '20px';
+			graphContainer.style.left = '20px';
+
+			graphContainer.style.borderLeft = '1px solid #dbe9f5';
+			graphContainer.style.borderRight = '1px solid #dbe9f5';
+			graphContainer.style.borderBottom = '1px solid #dbe9f5';
+			graphContainer.style.borderRadius = '8px';
+		}
+	} else {
+		let gWidth = window.innerWidth;
+		let gHeight = gWidth * 0.5;
+
+		graphCanvas.width = gWidth;
+		graphCanvas.height = gHeight;
+
+		// ★ 修正: 配置や枠線はコンテナに設定する
+		if (graphContainer) {
+			graphContainer.style.width = gWidth + 'px';
+			graphContainer.style.height = gHeight + 'px';
+			graphContainer.style.top = 'auto';
+			graphContainer.style.bottom = '0px';
+			graphContainer.style.left = '0px';
+
+			graphContainer.style.borderLeft = 'none';
+			graphContainer.style.borderRight = 'none';
+			graphContainer.style.borderBottom = 'none';
+			graphContainer.style.borderRadius = '16px 16px 0 0';
+		}
+	}
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
 // ★ 追加: メモリ確保を避けるための使い回し用配列
 const sharedThickArray = new Float32Array(2000);
@@ -27,6 +88,55 @@ const ENABLE_TOUCH_EFFECTS = true;
 let showLine = true; // 線の表示
 let showDot = false; // 円の表示
 let showShip = true; // ★ 船の表示（新規追加）
+
+// ==========================================
+// 一時停止状態の管理
+// ==========================================
+let isPaused = false;
+let pauseStartTime = 0;
+let gameTime = 0; // ★ アニメーション用ゲーム内時間
+
+window.togglePause = function () {
+	isPaused = !isPaused;
+	const icon = document.getElementById('pauseIcon');
+
+	if (isPaused) {
+		if (icon) icon.className = 'fa-solid fa-play';
+		pauseStartTime = performance.now(); // ポーズ開始時刻を記録
+	} else {
+		if (icon) icon.className = 'fa-solid fa-pause';
+		// ポーズしていた時間を計算し、lastTapTime をずらす（再開直後のタップ判定狂いを防ぐ）
+		let pauseDuration = performance.now() - pauseStartTime;
+		if (lastTapTime !== 0) {
+			lastTapTime += pauseDuration;
+		}
+
+		// ★ 追加: ポーズ解除時に描画用の内部時計も現在時刻にリセットし、ワープを完全に防ぐ
+		lastTime = performance.now();
+	}
+	console.log('一時停止:', isPaused ? 'ON' : 'OFF');
+};
+// ==========================================
+// ★ 追加: 設定メニューの開閉管理
+// ==========================================
+let isSettingsOpen = false;
+
+window.toggleSettings = function () {
+	isSettingsOpen = !isSettingsOpen;
+
+	const icon = document.getElementById('settingsIcon');
+	const uiContainer = document.getElementById('ui-container');
+
+	if (isSettingsOpen) {
+		// 開く時の処理: アイコンを「×」に変え、メニューを表示
+		icon.className = 'fa-solid fa-xmark';
+		uiContainer.classList.add('show');
+	} else {
+		// 閉じる時の処理: アイコンを「歯車」に戻し、メニューを隠す
+		icon.className = 'fa-solid fa-gear';
+		uiContainer.classList.remove('show');
+	}
+};
 
 // ★ 追加: 波のモード切り替えフラグ
 let instantWaveMode = false; // true: ラグなし(新方式), false: ラグあり(従来方式)
@@ -97,6 +207,31 @@ window.toggleAutoAmpCorrection = function () {
 	updateTargetAmpScale(); // ★ ON/OFF切り替え時に再計算
 };
 
+// ★ 追加: 次の問題から適用する自機画像のファイル名
+let nextShipSrc = 'ship_1.svg';
+
+// ★ 追加: 自機選択ボタンのイベント設定
+document.querySelectorAll('.ship-btn').forEach((btn) => {
+	btn.addEventListener('click', (e) => {
+		// 選択された自機のファイル名を取得
+		let selectedShip = btn.getAttribute('data-ship');
+		nextShipSrc = selectedShip;
+
+		// UIの選択状態（activeクラス）を更新
+		document.querySelectorAll('.ship-btn').forEach((b) => b.classList.remove('active'));
+		btn.classList.add('active');
+
+		// ==========================================
+		// ★ 追加: 選択された画像を即座に読み込み直す
+		// ==========================================
+		isShipLoaded = false;
+		shipImage.src = selectedShip;
+
+		// ★ 追加: 自機を変えたら設定を保存
+		saveSettings();
+	});
+});
+
 // ★ 船の画像を読み込み、色を合成波の色に合わせる
 const shipImage = new Image();
 const coloredShipCanvas = document.createElement('canvas');
@@ -152,6 +287,28 @@ window.toggleShowShip = function () {
 	showShip = !showShip;
 };
 
+// ==========================================
+// ★ 修正: グラフキャンバスの表示/非表示の切り替え
+// ==========================================
+let isGraphVisible = true;
+
+window.toggleShowGraph = function () {
+	isGraphVisible = !isGraphVisible;
+
+	// ★ 修正: グラフの表示反映 (applySettings関数内)
+	const graphContainer = document.getElementById('graph-container');
+	const showGraphBtn = document.getElementById('showGraphBtn');
+	if (graphContainer) {
+		graphContainer.style.display = isGraphVisible ? 'block' : 'none';
+	}
+	if (showGraphBtn) {
+		showGraphBtn.style.display = isGraphVisible ? 'none' : 'flex';
+	}
+
+	console.log('グラフ表示:', isGraphVisible ? 'ON' : 'OFF');
+	if (typeof saveSettings === 'function') saveSettings(); // 状態を保存
+};
+
 // キーボードでの切り替え (L: 線, D: 円, S: 船, Space: タップ)
 window.addEventListener('keydown', (e) => {
 	const key = e.key.toLowerCase();
@@ -163,6 +320,7 @@ window.addEventListener('keydown', (e) => {
 	if (key === 'r') window.toggleRhythmEffects(); // ★ Rキーで音ゲーエフェクト切替
 	if (key === 'p') window.togglePeakEmphasis(); // ★ Pキーでピーク強調切替を追加
 	if (key === 'c') window.toggleAutoAmpCorrection(); // ★ 追加: Cキーで振幅自動補正の切替
+	if (key === 'g') window.toggleShowGraph(); // ★ 追加: Cキーで振幅自動補正の切替
 
 	if (e.code === 'Space' || e.key === ' ') {
 		e.preventDefault();
@@ -175,8 +333,8 @@ window.addEventListener('keydown', (e) => {
 // ==========================================
 //  ゲームパラメータ
 // ==========================================
-const N = 16;
-const T_base = 4800; // 基本周期(ms) n=1の周期
+const N = 6;
+const T_base = 2400; // 基本周期(ms) n=1の周期
 
 // ★ 追加: 計算負荷を下げるため、各周波数(omega)を事前計算しておく
 const OMEGAS = new Array(N + 1).fill(0);
@@ -342,6 +500,12 @@ function initGame() {
 	lineRipples = [];
 	globalShake = 0;
 
+	// ==========================================
+	// ★ 追加: タップ判定に関わる状態を完全にリセット
+	// ==========================================
+	lastTapTime = 0;
+	intervals = [];
+
 	targetOffset = 0;
 	playerOffset = 0;
 	lastTime = performance.now();
@@ -351,6 +515,13 @@ function initGame() {
 	shipAnimState = 0;
 	shipOffsetX = 0;
 	shipVelocityX = 0;
+
+	// ==========================================
+	// ★ 修正: 選択されている自機を適用
+	// ==========================================
+	isShipLoaded = false;
+	shipImage.src = nextShipSrc;
+	// ==========================================
 
 	// ★ 追加: 水しぶきのリセット
 	splashes = [];
@@ -387,6 +558,9 @@ function initGame() {
 
 // タップ処理
 function registerTap(x, y) {
+	// ★ 追加: ポーズ中は入力やエフェクト生成を一切無視する
+	if (isPaused) return;
+
 	let now = performance.now();
 
 	// ★ 追加: 音ゲーエフェクト (タップ時のスパーク)
@@ -825,11 +999,18 @@ function drawCoefficientGraph() {
 	const midY = h / 2;
 
 	// MAX_COEFF に基づいて縦軸のスケールを決定
-	const maxVal = Math.ceil(MAX_COEFF) + 0.5;
-	const scaleY = (h / 2 - 60) / maxVal;
+	const maxVal = Math.ceil(MAX_COEFF) + 0.2;
+	const scaleY = (h / 2 - 20) / maxVal;
 
-	// N に基づいて横軸のスケールを決定
-	const stepX = (w - 30) / (N + 1); // 左側にY軸用の余白(30px)を確保
+	// ==========================================
+	// ★ 修正: 左右の余白を均等にし、0 と N+1 の位置を定義
+	// ==========================================
+	const marginX = 25; // 左右の余白（必要に応じて調整してください）
+	// (0 から N+1 まで) の区間を N+1 等分する
+	const stepX = (w - marginX * 2) / (N + 1);
+
+	const startX = marginX; // x = 0 の座標
+	const endX = w - marginX; // x = N+1 の座標
 
 	// ==========================================
 	// ★ 修正: showGraphGridがtrueの時のみグリッドと数値を描画
@@ -839,14 +1020,14 @@ function drawCoefficientGraph() {
 		graphCtx.strokeStyle = '#e0e0e0';
 		graphCtx.lineWidth = 1;
 
-		// 縦線 (Nの値によって数が動的に変わる)
-		for (let n = 1; n <= N; n++) {
-			let px = 30 + n * stepX;
-			graphCtx.beginPath();
-			graphCtx.moveTo(px, 0);
-			graphCtx.lineTo(px, h);
-			graphCtx.stroke();
-		}
+		// // 縦線 (Nの値によって数が動的に変わる)
+		// for (let n = 1; n <= N; n++) {
+		// 	let px = startX + n * stepX;
+		// 	graphCtx.beginPath();
+		// 	graphCtx.moveTo(px, 0);
+		// 	graphCtx.lineTo(px, h);
+		// 	graphCtx.stroke();
+		// }
 
 		// 横線とY軸の目盛り数値
 		let maxLine = Math.ceil(MAX_COEFF);
@@ -855,39 +1036,27 @@ function drawCoefficientGraph() {
 		graphCtx.textAlign = 'right';
 		graphCtx.textBaseline = 'middle';
 
-		for (let v = -maxLine; v <= maxLine; v++) {
-			if (v === 0) continue;
-			let py = midY - v * scaleY;
+		// for (let v = -maxLine; v <= maxLine; v++) {
+		// 	if (v === 0) continue;
+		// 	let py = midY - v * scaleY;
 
-			// グリッド線
-			graphCtx.beginPath();
-			graphCtx.moveTo(30, py);
-			graphCtx.lineTo(w, py);
-			graphCtx.stroke();
+		// 	// グリッド線
+		// 	graphCtx.beginPath();
+		// 	graphCtx.moveTo(startX, py); // 左端 (0の位置)
+		// 	graphCtx.lineTo(endX, py); // 右端 (N+1の位置)
+		// 	graphCtx.stroke();
 
-			// 目盛り数値の描画
-			graphCtx.fillText(v.toString(), 25, py);
-		}
-	}
+		// 	// 目盛り数値の描画
+		// 	// graphCtx.fillText(v.toString(), 25, py);
+		// }
 
-	// ==========================================
-	// グラフのX軸（中央線 y=0）※これは常に表示する
-	// ==========================================
-	graphCtx.strokeStyle = '#000';
-	graphCtx.lineWidth = 2;
-	graphCtx.beginPath();
-	graphCtx.moveTo(30, midY);
-	graphCtx.lineTo(w, midY);
-	graphCtx.stroke();
-
-	// ★ 修正: showGraphGridがtrueの時のみ0の目盛りとX軸ラベルを描画
-	if (showGraphGrid) {
+		// ★ 修正: showGraphGridがtrueの時のみ0の目盛りとX軸ラベルを描画
 		// 0の目盛り
 		graphCtx.fillStyle = '#666';
 		graphCtx.font = '12px Arial';
 		graphCtx.textAlign = 'right';
 		graphCtx.textBaseline = 'middle';
-		graphCtx.fillText('0', 25, midY);
+		// graphCtx.fillText('0', 25, midY);
 
 		// X軸ラベル (n=1, n=2...)
 		graphCtx.fillStyle = '#333';
@@ -895,22 +1064,33 @@ function drawCoefficientGraph() {
 		graphCtx.textAlign = 'center';
 		graphCtx.textBaseline = 'top';
 		for (let n = 1; n <= N; n++) {
-			let px = 30 + n * stepX;
+			let px = startX + n * stepX;
 			graphCtx.fillText(n, px, midY + 10);
 		}
+
+		// ★ 修正: showGraphGridがtrueの時のみタイトルと凡例を表示する
+		graphCtx.textAlign = 'left';
+		graphCtx.textBaseline = 'alphabetic';
+		graphCtx.font = '14px Arial';
+		graphCtx.fillStyle = '#333';
+		// スケール変更に合わせて文字のY座標も少し上に(30 -> 25)移動
+		graphCtx.fillText('Fourier係数', 15, 25);
+
+		graphCtx.font = '14px Arial';
+		graphCtx.fillStyle = '#666'; // 凡例はグレーに統一
+		graphCtx.fillText('▼ a (cos)', 120, 25);
+		graphCtx.fillText('▲ b (sin)', 200, 25);
 	}
 
-	// タイトルと凡例（形状ベースに変更）
-	graphCtx.textAlign = 'left';
-	graphCtx.textBaseline = 'alphabetic';
-	graphCtx.font = '16px Arial';
-	graphCtx.fillStyle = '#333';
-	graphCtx.fillText('Fourier係数', 15, 30);
-
-	graphCtx.font = '14px Arial';
-	graphCtx.fillStyle = '#666'; // 凡例はグレーに統一
-	graphCtx.fillText('▼ a (cos)', 130, 30);
-	graphCtx.fillText('▲ b (sin)', 215, 30);
+	// ==========================================
+	// グラフのX軸（中央線 y=0）※これは常に表示する
+	// ==========================================
+	graphCtx.beginPath();
+	graphCtx.moveTo(startX, midY); // 左端 (0の位置)
+	graphCtx.lineTo(endX, midY); // 右端 (N+1の位置)
+	graphCtx.strokeStyle = '#333';
+	graphCtx.lineWidth = 1;
+	graphCtx.stroke();
 
 	// ==========================================
 	// 三角形を描画するヘルパー関数
@@ -939,7 +1119,7 @@ function drawCoefficientGraph() {
 	for (let i = 0; i < extracted.length; i++) {
 		let ex = extracted[i];
 		let n = ex.n;
-		let px = 30 + n * stepX;
+		let px = startX + n * stepX;
 
 		// 分離された波の描画色（HSL）と一致させる
 		let waveColor = `hsl(${n * 50}, 60%, 65%)`;
@@ -989,8 +1169,23 @@ function drawCoefficientGraph() {
 function draw(time) {
 	requestAnimationFrame(draw);
 
-	let dt = time - lastTime;
-	lastTime = time;
+	// ★ 修正: ブラウザから渡されるtimeではなく、システム時計(performance.now)を直接使う
+	let now = performance.now();
+	let dt = now - lastTime;
+	lastTime = now;
+
+	// ★ 修正: dtが巨大になった場合だけでなく、スリープ復帰等でマイナスになった場合も防ぐ
+	if (dt > 100 || dt < 0) {
+		dt = 16;
+	}
+
+	// ポーズ中は経過時間を0にすることで全アニメーション・波の進行を停止
+	if (isPaused) {
+		dt = 0;
+	}
+
+	gameTime += dt; // ポーズ中は進まないゲーム内時間
+
 	let dt_sec = dt / 1000;
 
 	targetOffset += dt_sec * targetSpeed;
@@ -1074,8 +1269,16 @@ function draw(time) {
 		}
 	}
 
-	const playerWaveCenterY = 100;
-	const targetWaveCenterY = 220;
+	// const playerWaveCenterY = 100;
+	// const targetWaveCenterY = 220;
+
+	// ★ 修正後: 画面の高さ（canvas.height）に対する割合で配置する
+	// const playerWaveCenterY = canvas.height * 0.15; // 上から15%の位置
+	// const targetWaveCenterY = canvas.height * 0.35; // 上から35%の位置
+	// ★ 修正後: 画面の高さに比例したベースの振幅サイズを計算
+	const baseAmp = 20; // 画面の高さの2.5%を波の基本振幅にする
+	const playerWaveCenterY = canvas.height * 0.15;
+	const targetWaveCenterY = canvas.height * 0.35;
 
 	// ★ 円の配置基準位置 (キャンバス幅の1/5)
 	const baseX = canvas.width / 5;
@@ -1111,7 +1314,7 @@ function draw(time) {
 			y *= currentAmpScale;
 			d2 *= currentAmpScale;
 
-			let py = targetWaveCenterY - y * 15;
+			let py = targetWaveCenterY - y * baseAmp;
 			pts.push({ x: x, py: py, d2: d2 });
 		}
 		drawEmphasizedLine(ctx, pts, lineThickness, '#82a5c9', enablePeakEmphasis);
@@ -1135,7 +1338,7 @@ function draw(time) {
 			// ★ 修正: 補正スケールを適用
 			y *= currentAmpScale;
 
-			let py = targetWaveCenterY - y * 15;
+			let py = targetWaveCenterY - y * baseAmp;
 
 			// ★ 修正: 船が通常状態(0)のときだけ円をスキップする（飛んでいった後は円を描画する）
 			if (showShip && isShipLoaded && k === 0 && shipAnimState === 0) {
@@ -1192,8 +1395,8 @@ function draw(time) {
 		y_base *= currentAmpScale;
 		y_next *= currentAmpScale;
 
-		let shipY = targetWaveCenterY - y_base * 15;
-		let shipY_next = targetWaveCenterY - y_next * 15;
+		let shipY = targetWaveCenterY - y_base * baseAmp;
+		let shipY_next = targetWaveCenterY - y_next * baseAmp;
 
 		let shipAngle = Math.atan2(shipY_next - shipY, 1);
 
@@ -1261,7 +1464,6 @@ function draw(time) {
 	// 船の表示設定に関わらず、クリア時に左から現れて中央で止まる
 	// ==========================================
 	if (isCleared && shipAnimState === 2) {
-		// 船の後方(280px後ろ)を追従させつつ、キャンバス中央 (canvas.width / 2) を超えないよう制限する
 		let textX = Math.min(canvas.width / 2, currentShipX - 280);
 
 		ctx.save();
@@ -1269,20 +1471,26 @@ function draw(time) {
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
 
-		// 上下に少しだけフワフワと浮遊するような動きを追加
-		let floatY = Math.sin(performance.now() / 150) * 2;
+		let floatY = Math.sin(gameTime / 150) * 2;
 		let textY = targetWaveCenterY - 25 + floatY;
 
-		// 文字の縁取り（波のアクセントカラー合わせ）
-		// ctx.lineWidth = 8;
-		// ctx.strokeStyle = '#4b6c8f';
-		// ctx.strokeText('ALL CLEAR!', textX, textY);
-
-		// 文字の塗りつぶし（白）
 		ctx.fillStyle = '#4b6c8f';
 		ctx.fillText('ALL CLEAR!', textX, textY);
 
 		ctx.restore();
+
+		// ==========================================
+		// ★ 追加: 「ALL CLEAR!」表示から数秒後（例: 2秒後）にボタンを表示する
+		// ==========================================
+		if (!isClearButtonsShown) {
+			isClearButtonsShown = true;
+			setTimeout(() => {
+				const clearBtns = document.getElementById('clear-buttons-container');
+				if (clearBtns) {
+					clearBtns.style.display = 'flex';
+				}
+			}, 1500); // 2000ミリ秒 = 2秒後
+		}
 	}
 
 	updateWaveBuffer();
@@ -1299,7 +1507,7 @@ function draw(time) {
 
 				if (x >= -20 && x <= canvas.width + 20) {
 					let waveY = instantWaveMode ? p.baseY * displayAmplitude : p.y;
-					let py = playerWaveCenterY - waveY * 15;
+					let py = playerWaveCenterY - waveY * baseAmp;
 
 					// ★ 修正: ENABLE_TOUCH_EFFECTS から enableRhythmEffects に変更
 					if (enableRhythmEffects) {
@@ -1347,7 +1555,7 @@ function draw(time) {
 
 						// ★ モードによって高さを切り替え
 						let waveY = instantWaveMode ? p.baseY * displayAmplitude : p.y;
-						let py = playerWaveCenterY - waveY * 15;
+						let py = playerWaveCenterY - waveY * baseAmp;
 
 						// ★ 修正: ENABLE_TOUCH_EFFECTS から enableRhythmEffects に変更
 						if (enableRhythmEffects) {
@@ -1389,16 +1597,16 @@ function draw(time) {
 		}
 	}
 
-	// キャンバス下部の描画可能領域を計算
-	let startY = 360; // 描画開始位置
-	let endMargin = 40; // 一番下の余白
+	// 描画開始位置（画面の55%の位置から）
+	let startY = canvas.height * 0.55;
+	let endMargin = 40;
 	let availableHeight = canvas.height - endMargin - startY;
 
-	// 波の総数に応じて縦のオフセット（間隔）を計算 (最大間隔は従来通りの45)
+	// ★ 修正: 波の間隔の最大値は「45px(固定)」
 	let yOffset = Math.min(45, availableHeight / Math.max(1, totalValidWaves));
 
-	// 波同士が重なりすぎないように、間隔に応じて波の高さ(振幅スケール)も制限する
-	let ampScale = Math.min(12, yOffset * 0.5);
+	// ★ 修正: 分離された波の振幅スケールの最大値も「12px(固定)」
+	let ampScale = Math.min(12, yOffset * 0.4);
 
 	for (let i = 0; i < extracted.length; i++) {
 		let ex = extracted[i];
@@ -1557,6 +1765,141 @@ function draw(time) {
 	drawCoefficientGraph();
 }
 
+// ==========================================
+// ★ 追加: 設定の保存と読み込み機能
+// ==========================================
+
+// デフォルト設定の定義
+const defaultSettings = {
+	waveSpeed: 300,
+	lineThickness: 2.5,
+	dotSpacing: 60,
+	dotRadius: 8,
+	dotAccentInterval: 6,
+	showLine: true,
+	showDot: false,
+	showShip: true,
+	isGraphVisible: true,
+	selectedShip: 'ship_1.svg',
+};
+
+// 1. 設定を適用する関数 (UIとゲーム内変数を両方更新する)
+window.applySettings = function (settings) {
+	// スライダーのUI更新
+	document.getElementById('speedSlider').value = settings.waveSpeed;
+	document.getElementById('lineThicknessSlider').value = settings.lineThickness;
+	document.getElementById('dotSpacingSlider').value = settings.dotSpacing;
+	document.getElementById('dotRadiusSlider').value = settings.dotRadius;
+	document.getElementById('dotAccentIntervalSlider').value = settings.dotAccentInterval;
+
+	// ゲーム内パラメーターの更新
+	if (typeof setWaveSpeed === 'function') setWaveSpeed(settings.waveSpeed);
+	if (typeof setLineThickness === 'function') setLineThickness(settings.lineThickness);
+	if (typeof setDotSpacing === 'function') setDotSpacing(settings.dotSpacing);
+	if (typeof setDotRadius === 'function') setDotRadius(settings.dotRadius);
+	if (typeof setDotAccentInterval === 'function') setDotAccentInterval(settings.dotAccentInterval);
+
+	// トグル系フラグの更新
+	if (typeof showLine !== 'undefined') showLine = settings.showLine;
+	if (typeof showDot !== 'undefined') showDot = settings.showDot;
+	if (typeof showShip !== 'undefined') showShip = settings.showShip;
+	isGraphVisible = settings.isGraphVisible;
+
+	// ==========================================
+	// ★ 追加: トグルスイッチのUI表示状態を同期させる
+	// ==========================================
+	if (document.getElementById('chkShowLine'))
+		document.getElementById('chkShowLine').checked = showLine;
+	if (document.getElementById('chkShowDot'))
+		document.getElementById('chkShowDot').checked = showDot;
+	if (document.getElementById('chkShowShip'))
+		document.getElementById('chkShowShip').checked = showShip;
+
+	// ==========================================
+	// ★ 修正: グラフの表示反映（コンテナとボタンの両方を制御する）
+	// ==========================================
+	const graphContainer = document.getElementById('graph-container');
+	const showGraphBtn = document.getElementById('showGraphBtn');
+
+	if (graphContainer) {
+		graphContainer.style.display = isGraphVisible ? 'block' : 'none';
+	}
+	if (showGraphBtn) {
+		showGraphBtn.style.display = isGraphVisible ? 'none' : 'flex';
+	}
+	// ==========================================
+
+	// 自機の反映
+	nextShipSrc = settings.selectedShip;
+	document.querySelectorAll('.ship-btn').forEach((btn) => {
+		if (btn.getAttribute('data-ship') === settings.selectedShip) {
+			btn.classList.add('active');
+			if (typeof shipImage !== 'undefined') {
+				isShipLoaded = false;
+				shipImage.src = settings.selectedShip;
+			}
+		} else {
+			btn.classList.remove('active');
+		}
+	});
+};
+
+// 2. 現在の状態を localStorage に保存する関数
+window.saveSettings = function () {
+	const settings = {
+		waveSpeed: Number(document.getElementById('speedSlider').value),
+		lineThickness: Number(document.getElementById('lineThicknessSlider').value),
+		dotSpacing: Number(document.getElementById('dotSpacingSlider').value),
+		dotRadius: Number(document.getElementById('dotRadiusSlider').value),
+		dotAccentInterval: Number(document.getElementById('dotAccentIntervalSlider').value),
+		showLine: typeof showLine !== 'undefined' ? showLine : true,
+		showDot: typeof showDot !== 'undefined' ? showDot : true,
+		showShip: typeof showShip !== 'undefined' ? showShip : true,
+		isGraphVisible: isGraphVisible,
+		selectedShip: nextShipSrc,
+	};
+	localStorage.setItem('fourielSettings', JSON.stringify(settings));
+};
+
+// 3. localStorage から読み込む関数
+window.loadSettings = function () {
+	const savedData = localStorage.getItem('fourielSettings');
+	let settings = { ...defaultSettings }; // デフォルトをベースにする
+	if (savedData) {
+		try {
+			// 保存データがあれば上書きする
+			const parsed = JSON.parse(savedData);
+			settings = { ...settings, ...parsed };
+		} catch (e) {
+			console.error('設定の読み込みに失敗しました', e);
+		}
+	}
+	applySettings(settings);
+};
+
+// 4. デフォルトに戻す関数
+window.resetSettings = function () {
+	// if (confirm('設定をデフォルトに戻しますか？')) {
+	// 現在の自機の選択状態を取得して保持する
+	// 現在の自機の選択状態とグラフの表示状態を取得して保持する
+	const currentShip = nextShipSrc;
+	const currentGraphVisible = isGraphVisible;
+
+	// デフォルト設定を展開しつつ、保持したい項目だけ現在の値で上書きして適用する
+	const settingsToApply = {
+		...defaultSettings,
+		selectedShip: currentShip,
+		isGraphVisible: currentGraphVisible,
+	};
+
+	applySettings(settingsToApply);
+	saveSettings();
+	// }
+};
+
+// ★ 追加: ロード時に保存された設定を読み込んで反映する
+loadSettings();
+
 initGame();
 requestAnimationFrame(draw);
 
@@ -1569,3 +1912,25 @@ if (nextButton) {
 		initGame(); // ゲームの状態をリセットして新しい波を生成
 	});
 }
+
+// ==========================================
+// ★ 追加: ホーム画面に戻る処理
+// ==========================================
+window.goHome = function () {
+	window.location.href = 'index.html';
+};
+
+// ==========================================
+// ★ 追加: 次の問題に進む処理（設定画面の処理を流用）
+// ==========================================
+window.nextProblem = function () {
+	// ボタンを隠す
+	const clearBtns = document.getElementById('clear-buttons-container');
+	if (clearBtns) {
+		clearBtns.style.display = 'none';
+	}
+	isClearButtonsShown = false;
+
+	// 設定画面にある「次の問題に進む」ボタンの処理を流用・実行
+	initGame();
+};

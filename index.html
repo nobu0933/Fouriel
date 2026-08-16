@@ -3,65 +3,202 @@
 	<head>
 		<meta charset="UTF-8" />
 		<title>FOURIEL</title>
+		<link
+			rel="stylesheet"
+			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+		/>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
-		<h1>FOURIEL</h1>
-		<p>流れる波のリズムに合わせて画面を <strong>連続で一定間隔でタップ</strong> しましょう。</p>
-		<p>タップ間隔から周期を判定し、合成波からその成分を引き抜きます。</p>
+		<div id="app-container">
+			<canvas id="gameCanvas"></canvas>
 
-		<button id="nextButton">次の問題に進む</button>
+			<!-- ========================================== -->
+			<!-- ★ 修正: オールクリア後に表示されるボタン群 -->
+			<!-- ========================================== -->
+			<div
+				id="clear-buttons-container"
+				style="
+					display: none;
+					position: absolute;
+					top: 38%; /* ★ 65% から 45% に変更（波のすぐ下） */
+					left: 50%;
+					transform: translate(-50%, -50%);
+					gap: 30px; /* ★ ボタン同士の間隔も少し広げると見栄えが良くなります */
+					z-index: 100;
+				"
+			>
+				<button class="clear-action-btn" onclick="nextProblem()">次の問題</button>
+				<button class="clear-action-btn" onclick="goHome()">ホームに戻る</button>
+			</div>
 
-		<!-- キャンバスを横並びにするラッパー -->
-		<div class="canvas-wrapper">
-			<canvas id="graphCanvas" width="350" height="600"></canvas>
-			<canvas id="gameCanvas" width="800" height="600"></canvas>
+			<!-- ★ 修正: グラフキャンバスを div で囲み、閉じるボタンを追加 -->
+			<div id="graph-container">
+				<button id="closeGraphBtn" onclick="toggleShowGraph()">
+					<i class="fa-solid fa-xmark"></i>
+				</button>
+				<canvas id="graphCanvas"></canvas>
+			</div>
+
+			<!-- ★ 追加: 画面左下に配置するグラフ表示ボタン -->
+			<button id="showGraphBtn" onclick="toggleShowGraph()">
+				<i class="fa-solid fa-chart-simple"></i>
+			</button>
+
+			<div id="top-right-controls">
+				<button id="pauseBtn" onclick="togglePause()">
+					<i id="pauseIcon" class="fa-solid fa-pause"></i>
+				</button>
+				<button id="homeBtn" onclick="goHome()">
+					<i id="homeIcon" class="fa-solid fa-house"></i>
+				</button>
+				<button id="settingsBtn" onclick="toggleSettings()">
+					<i id="settingsIcon" class="fa-solid fa-gear"></i>
+				</button>
+			</div>
+
+			<!-- ★ 修正: 設定メニューの中身 -->
+			<div id="ui-container">
+				<button id="nextButton">次の問題に進む</button>
+
+				<div id="msg"></div>
+
+				<div id="ship-selector" class="ship-selector-container">
+					<!-- 自機選択ボタンはそのまま -->
+					<button class="ship-btn active" data-ship="ship_1.svg">
+						<img src="ship_1.svg" alt="Ship 1" />
+					</button>
+					<button class="ship-btn" data-ship="ship_2.svg">
+						<img src="ship_2.svg" alt="Ship 2" />
+					</button>
+					<button class="ship-btn" data-ship="ship_3.svg">
+						<img src="ship_3.svg" alt="Ship 3" />
+					</button>
+					<button class="ship-btn" data-ship="ship_4.svg">
+						<img src="ship_4.svg" alt="Ship 4" />
+					</button>
+				</div>
+
+				<hr style="width: 100%; border: 0; border-top: 1px solid #dbe9f5; margin: 5px 0" />
+
+				<!-- ========================================== -->
+				<!-- ★ 修正: 切り替え項目をトグルスイッチに変更 -->
+				<!-- ========================================== -->
+				<div class="setting-row">
+					<span>線の表示</span>
+					<label class="toggle-switch">
+						<input
+							type="checkbox"
+							id="chkShowLine"
+							onchange="
+								toggleShowLine();
+								saveSettings();
+							"
+						/>
+						<span class="toggle-slider"></span>
+					</label>
+				</div>
+				<div class="setting-row">
+					<span>円の表示</span>
+					<label class="toggle-switch">
+						<input
+							type="checkbox"
+							id="chkShowDot"
+							onchange="
+								toggleShowDot();
+								saveSettings();
+							"
+						/>
+						<span class="toggle-slider"></span>
+					</label>
+				</div>
+				<div class="setting-row">
+					<span>船の表示</span>
+					<label class="toggle-switch">
+						<input
+							type="checkbox"
+							id="chkShowShip"
+							onchange="
+								toggleShowShip();
+								saveSettings();
+							"
+						/>
+						<span class="toggle-slider"></span>
+					</label>
+				</div>
+
+				<hr style="width: 100%; border: 0; border-top: 1px solid #dbe9f5; margin: 5px 0" />
+
+				<!-- ★ 修正: 各スライダーに id を追加し、onchange 等で saveSettings を呼ぶ -->
+				<label
+					>進行速度:
+					<input
+						type="range"
+						id="speedSlider"
+						min="50"
+						max="800"
+						value="300"
+						oninput="setWaveSpeed(this.value)"
+						onchange="saveSettings()"
+				/></label>
+				<label
+					>線の太さ:
+					<input
+						type="range"
+						id="lineThicknessSlider"
+						min="0.5"
+						max="10"
+						step="0.5"
+						value="2.5"
+						oninput="setLineThickness(this.value)"
+						onchange="saveSettings()"
+				/></label>
+				<label
+					>円の間隔:
+					<input
+						type="range"
+						id="dotSpacingSlider"
+						min="4"
+						max="100"
+						value="12"
+						oninput="setDotSpacing(this.value)"
+						onchange="saveSettings()"
+				/></label>
+				<label
+					>円の半径:
+					<input
+						type="range"
+						id="dotRadiusSlider"
+						min="1"
+						max="10"
+						value="4"
+						oninput="setDotRadius(this.value)"
+						onchange="saveSettings()"
+				/></label>
+				<label
+					>濃い円の間隔:
+					<input
+						type="range"
+						id="dotAccentIntervalSlider"
+						min="1"
+						max="20"
+						value="5"
+						oninput="setDotAccentInterval(this.value)"
+						onchange="saveSettings()"
+				/></label>
+
+				<hr style="width: 100%; border: 0; border-top: 1px solid #dbe9f5; margin: 5px 0" />
+
+				<!-- ★ 追加: デフォルトに戻すボタン -->
+				<button
+					onclick="resetSettings()"
+					style="background-color: #ffebf0; color: #d93d5e; border-color: #ffccd5"
+				>
+					設定をデフォルトに戻す
+				</button>
+			</div>
 		</div>
 
-		<div id="msg"></div>
-
-		<!-- トグルボタン -->
-		<button onclick="toggleShowLine()">線の表示 ON/OFF</button>
-		<button onclick="toggleShowDot()">円の表示 ON/OFF</button>
-		<button onclick="toggleShowShip()">船の表示/非表示</button>
-
-		<label for="speedSlider">進行速度: </label>
-		<input
-			type="range"
-			id="speedSlider"
-			min="50"
-			max="800"
-			value="300"
-			oninput="setWaveSpeed(this.value)"
-		/>
-
-		<!-- 線の太さ調整スライダー -->
-		<label
-			>線の太さ:
-			<input
-				type="range"
-				min="0.5"
-				max="10"
-				step="0.5"
-				value="2.5"
-				oninput="setLineThickness(this.value)"
-		/></label>
-
-		<!-- 円の設定スライダー -->
-		<label
-			>円の間隔:
-			<input type="range" min="4" max="100" value="12" oninput="setDotSpacing(this.value)"
-		/></label>
-		<label
-			>円の半径: <input type="range" min="1" max="10" value="4" oninput="setDotRadius(this.value)"
-		/></label>
-
-		<label
-			>濃い円の間隔:
-			<input type="range" min="1" max="20" value="5" oninput="setDotAccentInterval(this.value)"
-		/></label>
-
-		<!-- JavaScriptの読み込みはbodyの最後に行います -->
 		<script src="script.js"></script>
 	</body>
 </html>

@@ -1,54 +1,306 @@
-body {
-	background-color: #f4f9ff;
-	color: #4a5d73;
-	font-family: 'Helvetica Neue', Arial, sans-serif;
-	text-align: center;
+body,
+html {
 	margin: 0;
-	padding: 20px;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+	overflow: hidden; /* スクロールバーを隠す */
+	background-color: #f4f9ff;
+	font-family: 'Helvetica Neue', Arial, sans-serif;
 	user-select: none;
 }
 
-h1 {
-	margin-top: 0;
-	color: #609cd9;
-	font-weight: 300;
-	letter-spacing: 2px;
+#app-container {
+	position: relative;
+	width: 100vw;
+	height: 100vh;
 }
 
-p {
-	font-size: 14px;
-	margin-bottom: 5px;
-	color: #7b8d9e;
-}
-
-/* キャンバスを横に並べるためのコンテナ */
-.canvas-wrapper {
-	display: flex;
-	justify-content: center;
-	align-items: stretch; /* 高さを揃える */
-	gap: 20px;
-	margin: 20px auto;
-	max-width: 100%;
-}
-
-canvas {
+/* ゲームキャンバスを画面いっぱいに広げる */
+#gameCanvas {
+	display: block;
+	width: 100%;
+	height: 100%;
 	background-color: #ffffff;
-	border: 1px solid #dbe9f5;
-	border-radius: 12px;
 	cursor: pointer;
 	touch-action: none;
-	box-shadow: 0 8px 24px rgba(96, 156, 217, 0.15);
 }
 
-/* グラフキャンバスの見た目調整（必要に応じて） */
+/* ==========================================
+   ★ 修正・追加: グラフコンテナとボタン群
+========================================== */
+/* 元々 #graphCanvas にあった装飾をコンテナに移動 */
+#graph-container {
+	position: absolute;
+	background-color: rgba(255, 255, 255, 0.85);
+	box-shadow: 0 4px 12px rgba(96, 156, 217, 0.2);
+	z-index: 10;
+	overflow: hidden; /* 角丸からキャンバスがはみ出ないようにする */
+}
+
+/* キャンバス本体はコンテナにぴったり合わせる */
 #graphCanvas {
-	cursor: default; /* グラフ側はクリック不要なので標準カーソルに */
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* グラフ右上の「閉じる(×)」ボタン */
+#closeGraphBtn {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 28px;
+	height: 28px;
+	border: none;
+	background-color: rgba(230, 240, 250, 0.8);
+	border-radius: 50%;
+	cursor: pointer;
+	color: #4a5d73;
+	font-size: 15px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 20;
+	transition: all 0.2s ease;
+}
+#closeGraphBtn:hover {
+	background-color: #dbe9f5;
+}
+
+/* 画面左下の「グラフ表示」ボタン */
+#showGraphBtn {
+	position: absolute;
+	bottom: 20px;
+	left: 20px;
+	width: 44px;
+	height: 44px;
+	border-radius: 8px;
+	background-color: rgba(255, 255, 255, 0.85);
+	border: 1px solid #dbe9f5;
+	font-size: 20px;
+	color: #4a5d73;
+	cursor: pointer;
+	display: none; /* 初期状態（JSで制御） */
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 4px 12px rgba(96, 156, 217, 0.2);
+	z-index: 5;
+	transition: all 0.2s ease;
+}
+#showGraphBtn:hover {
+	background-color: #ffffff;
+	transform: translateY(-2px);
+}
+
+/* 右側に浮かせるUIコントロール群 */
+#ui-container {
+	position: absolute;
+	top: 74px; /* ボタンのすぐ下 (20px + 44px + 余白10px) */
+	right: 20px;
+	width: 250px;
+	max-height: 80vh;
+	overflow-y: auto;
+	background-color: rgba(255, 255, 255, 0.95);
+	border: 1px solid #dbe9f5;
+	border-radius: 12px;
+	padding: 15px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+	z-index: 20;
+
+	/* 初期状態では非表示 */
+	display: none;
+	flex-direction: column;
+	gap: 10px;
+}
+
+/* クラスが付与された時だけ表示する */
+#ui-container.show {
+	display: flex;
+}
+
+#ui-container button,
+#ui-container label {
+	font-size: 13px;
+	color: #4a5d73;
 }
 
 #msg {
-	font-size: 20px;
-	font-weight: normal;
+	font-size: 16px;
+	font-weight: bold;
 	color: #48b884;
-	margin-top: 15px;
-	min-height: 30px;
+	text-align: center;
+	min-height: 20px;
+}
+
+.ship-selector-container {
+	display: flex;
+	justify-content: center;
+	gap: 10px;
+}
+
+.ship-btn {
+	width: 50px;
+	height: 50px;
+	border: 2px solid #555;
+	border-radius: 8px;
+	background-color: transparent;
+	cursor: pointer;
+	padding: 5px;
+	transition: all 0.2s ease;
+}
+
+.ship-btn:hover {
+	background-color: rgba(255, 255, 255, 0.1);
+}
+
+.ship-btn.active {
+	border-color: #4caf50;
+	background-color: rgba(76, 175, 80, 0.2);
+}
+
+.ship-btn img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+/* 一時停止ボタン */
+#pauseBtn {
+	padding: 8px;
+	font-size: 18px;
+	cursor: pointer;
+	background-color: #f4f9ff;
+	border: 1px solid #dbe9f5;
+	border-radius: 8px;
+}
+
+/* ==========================================
+   ★ 追加: 右上のボタン群 (一時停止 & 設定)
+========================================== */
+#top-right-controls {
+	position: absolute;
+	top: 20px;
+	right: 20px;
+	display: flex;
+	gap: 10px;
+	z-index: 30; /* ui-containerよりも上に表示 */
+}
+
+#pauseBtn,
+#homeBtn,
+#settingsBtn {
+	width: 44px;
+	height: 44px;
+	border-radius: 8px;
+	background-color: rgba(255, 255, 255, 0.85);
+	border: 1px solid #dbe9f5;
+	font-size: 20px;
+	color: #4a5d73;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 4px 12px rgba(96, 156, 217, 0.2);
+	transition: all 0.2s ease;
+}
+
+#pauseBtn:hover,
+#homeBtn:hover,
+#settingsBtn:hover {
+	background-color: #ffffff;
+	transform: translateY(-2px);
+}
+
+/* ==========================================
+   ★ 追加: クリア後のアクションボタンのデザイン（文字風＋下線）
+   ========================================== */
+.clear-action-btn {
+	background: none;
+	border: none;
+	border-bottom: 3px solid #4b6c8f; /* ALL CLEAR! と同じ色の下線 */
+	padding: 5px 10px;
+	font-size: 1.2rem;
+	font-weight: bold;
+	color: #4b6c8f;
+	cursor: pointer;
+	transition:
+		opacity 0.2s,
+		transform 0.1s;
+}
+
+.clear-action-btn:hover {
+	opacity: 0.75;
+	transform: scale(1.05);
+}
+
+.clear-action-btn:active {
+	transform: scale(0.95);
+}
+
+/* ==========================================
+   ★ 追加: トグルスイッチと設定項目のレイアウト
+   ========================================== */
+.setting-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 4px 5px;
+	color: #4a5d73;
+	font-size: 13px;
+	font-weight: bold;
+}
+
+/* トグルスイッチのコンテナ */
+.toggle-switch {
+	position: relative;
+	display: inline-block;
+	width: 44px;
+	height: 24px;
+	margin: 0;
+}
+
+/* デフォルトのチェックボックスを隠す */
+.toggle-switch input {
+	opacity: 0;
+	width: 0;
+	height: 0;
+}
+
+/* スライダー（背景部分） */
+.toggle-slider {
+	position: absolute;
+	cursor: pointer;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: #cbd5e1;
+	transition: 0.3s;
+	border-radius: 24px;
+	box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* スライダーの丸いツマミ部分 */
+.toggle-slider:before {
+	position: absolute;
+	content: '';
+	height: 18px;
+	width: 18px;
+	left: 3px;
+	bottom: 3px;
+	background-color: white;
+	transition: 0.3s;
+	border-radius: 50%;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* チェックが入ったとき（ON）のスタイル */
+input:checked + .toggle-slider {
+	background-color: #48b884; /* 緑色 */
+}
+
+/* チェックが入ったときのツマミの移動 */
+input:checked + .toggle-slider:before {
+	transform: translateX(20px);
 }
