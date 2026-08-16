@@ -4,8 +4,19 @@ const ctx = canvas.getContext('2d');
 const graphCanvas = document.getElementById('graphCanvas');
 const graphCtx = graphCanvas.getContext('2d');
 
+// モードを保持する変数を追加（ファイルの先頭付近やグローバル変数定義の場所に記述）
+let currentGameMode = '';
+
+// 英語表記のモード名を日本語に変換したい場合のマッピング（必要に応じて）
+const modeNames = {
+	tutorial: 'チュートリアル',
+	easy: 'イージー',
+	hard: 'ハード',
+};
+
 // ★ 追加: クリアボタンが既に表示されたかどうかのフラグ
 let isClearButtonsShown = false;
+let clearButtonTimer = null; // ★ 追加: ボタン表示タイマーのID保持用
 
 // ==========================================
 // ★ 修正: ウィンドウリサイズに合わせて解像度とグラフのレイアウトを更新
@@ -72,7 +83,7 @@ const sharedThickArray = new Float32Array(2000);
 // ==========================================
 // ★ 追加: グラフのグリッド・数値の表示状態管理
 // ==========================================
-let showGraphGrid = false; // デフォルトはオフ
+let showGraphGrid = true; // デフォルトはオフ
 
 // グラフのキャンバスをクリックしたらトグルする
 graphCanvas.addEventListener('click', () => {
@@ -121,19 +132,25 @@ window.togglePause = function () {
 // ==========================================
 let isSettingsOpen = false;
 
+// ==========================================
+// ★ 修正: 設定メニューの開閉管理 (ホーム画面と共用)
+// ==========================================
 window.toggleSettings = function () {
 	isSettingsOpen = !isSettingsOpen;
 
 	const icon = document.getElementById('settingsIcon');
+	const homeIcon = document.getElementById('homeSettingsIcon'); // ★ 追加
 	const uiContainer = document.getElementById('ui-container');
 
 	if (isSettingsOpen) {
 		// 開く時の処理: アイコンを「×」に変え、メニューを表示
-		icon.className = 'fa-solid fa-xmark';
+		if (icon) icon.className = 'fa-solid fa-xmark';
+		if (homeIcon) homeIcon.className = 'fa-solid fa-xmark'; // ★ 追加
 		uiContainer.classList.add('show');
 	} else {
 		// 閉じる時の処理: アイコンを「歯車」に戻し、メニューを隠す
-		icon.className = 'fa-solid fa-gear';
+		if (icon) icon.className = 'fa-solid fa-gear';
+		if (homeIcon) homeIcon.className = 'fa-solid fa-gear'; // ★ 追加
 		uiContainer.classList.remove('show');
 	}
 };
@@ -182,7 +199,7 @@ window.togglePeakEmphasis = function () {
 let enableAutoAmpCorrection = true; // 補正機能のON/OFF
 let currentAmpScale = 1.0; // 現在適用されているスケール値
 let targetAmpScale = 1.0; // ★ 追加: 目標となるスケール値
-const MAX_WAVE_AMPLITUDE = 6.0;
+const MAX_WAVE_AMPLITUDE = 4.0;
 
 // ★ 修正: 目標スケールを計算する関数（必要な時だけ呼ぶ）
 window.updateTargetAmpScale = function () {
@@ -358,8 +375,8 @@ window.setCoeffPresenceProbability = function (value) {
 
 // 流れる速度の設定 (ピクセル/秒)
 // ★ const から let に変更して可変にします
-let targetSpeed = 300;
-let playerSpeed = 300;
+let targetSpeed = 400;
+let playerSpeed = 400;
 
 // ★ 波の進行速度を変更するためのグローバル関数を追加
 window.setWaveSpeed = function (value) {
@@ -476,6 +493,17 @@ function generateCoefficient() {
 }
 
 function initGame() {
+	// ★ 追加: タイマーの割り込みキャンセルとボタン非表示
+	if (clearButtonTimer) {
+		clearTimeout(clearButtonTimer);
+		clearButtonTimer = null;
+	}
+	isClearButtonsShown = false;
+	const clearBtns = document.getElementById('clear-buttons-container');
+	if (clearBtns) {
+		clearBtns.style.display = 'none';
+	}
+
 	let hasNonZero = false;
 	for (let n = 1; n <= N; n++) {
 		a[n] = generateCoefficient();
@@ -1484,12 +1512,15 @@ function draw(time) {
 		// ==========================================
 		if (!isClearButtonsShown) {
 			isClearButtonsShown = true;
-			setTimeout(() => {
-				const clearBtns = document.getElementById('clear-buttons-container');
-				if (clearBtns) {
-					clearBtns.style.display = 'flex';
+			clearButtonTimer = setTimeout(() => {
+				if (isCleared) {
+					// ★ 追加: タイマー発火時に本当にクリア状態か確認
+					const clearBtns = document.getElementById('clear-buttons-container');
+					if (clearBtns) {
+						clearBtns.style.display = 'flex';
+					}
 				}
-			}, 1500); // 2000ミリ秒 = 2秒後
+			}, 1500);
 		}
 	}
 
@@ -1763,6 +1794,22 @@ function draw(time) {
 	// 5. 新キャンバスへ係数グラフを描画
 	// ==========================================
 	drawCoefficientGraph();
+
+	// ==========================================
+	// ★ 画面左上にゲームモードを表示
+	// ==========================================
+	if (currentGameMode) {
+		ctx.save();
+		ctx.font = 'bold 16px Arial, sans-serif'; // 文字のフォントとサイズ
+		ctx.fillStyle = '#4b6c8f'; // 文字色（見やすい青灰色など）
+		ctx.textAlign = 'left';
+		ctx.textBaseline = 'top';
+
+		// 左上 (X: 20px, Y: 20px) の位置に描画
+		ctx.fillText(`${currentGameMode}`, 20, 20);
+
+		ctx.restore();
+	}
 }
 
 // ==========================================
@@ -1771,7 +1818,7 @@ function draw(time) {
 
 // デフォルト設定の定義
 const defaultSettings = {
-	waveSpeed: 300,
+	waveSpeed: 400,
 	lineThickness: 2.5,
 	dotSpacing: 60,
 	dotRadius: 8,
@@ -1900,6 +1947,319 @@ window.resetSettings = function () {
 // ★ 追加: ロード時に保存された設定を読み込んで反映する
 loadSettings();
 
+// ==========================================
+// ★ 修正: ホーム画面の波とタイトルのアニメーション (減衰処理をゲーム画面と完全統一)
+// ==========================================
+let homeRipples = []; // タップ時の波紋エフェクト配列
+let homeWaveBuffer = []; // 波の履歴を保存するバッファ
+let homePlayerOffset = 0; // ホーム画面用のスクロールオフセット
+let homeFreqMultiplier = 1.0; // 波の周波数倍率
+let cachedTitleColor = null;
+let lastHomeTime = performance.now();
+let homeLastTapTime = 0; // 最後にタップした時間を記録
+let homeCurrentDecayRate = 0; // ★ 追加: 現在の振幅減衰率
+let homeTapIntervals = []; // ★ 追加: 実際のタップ間隔を記録する配列
+
+// ラグありモード（instantWaveMode = false）を再現するためのターゲットとジェネレータ
+const defaultHomeOmega = (2 * Math.PI) / (2400 / 1000);
+let homePlayerTarget = {
+	omega: defaultHomeOmega,
+	amplitude: 0,
+};
+let homeGenerator = {
+	lastT: 0,
+	phi: 0,
+	omega: defaultHomeOmega,
+	omegaVel: 0,
+	amplitude: 0,
+	ampVel: 0,
+};
+
+// ==========================================
+// ★ 追加: ホーム画面の波を初期状態にリセットする関数
+// ==========================================
+function resetHomeWave() {
+	const tBase = typeof T_base !== 'undefined' ? T_base : 2400;
+	const baseOmega = (2 * Math.PI) / (tBase / 1000);
+
+	homePlayerTarget = { omega: baseOmega, amplitude: 0 };
+	homeGenerator = { lastT: 0, phi: 0, omega: baseOmega, omegaVel: 0, amplitude: 0, ampVel: 0 };
+	homeFreqMultiplier = 1.0;
+	homeLastTapTime = 0;
+	homeCurrentDecayRate = 0;
+	homeTapIntervals = [];
+	homeRipples = [];
+	homeWaveBuffer = [];
+}
+
+function initHomeWave() {
+	const canvas = document.getElementById('homeWaveCanvas');
+	if (!canvas) return;
+	const ctx = canvas.getContext('2d');
+
+	// 上が見切れないよう高さを少し拡張 (100 -> 140)
+	canvas.width = 800;
+	canvas.height = 140;
+
+	// 波紋専用キャンバスの初期化
+	let rippleCanvas = document.getElementById('homeRippleCanvas');
+	if (!rippleCanvas) {
+		rippleCanvas = document.createElement('canvas');
+		rippleCanvas.id = 'homeRippleCanvas';
+		rippleCanvas.style.position = 'fixed';
+		rippleCanvas.style.top = '0';
+		rippleCanvas.style.left = '0';
+		rippleCanvas.style.pointerEvents = 'none';
+		rippleCanvas.style.zIndex = '9999';
+		document.body.appendChild(rippleCanvas);
+	}
+	const rippleCtx = rippleCanvas.getContext('2d');
+
+	const resizeRippleCanvas = () => {
+		rippleCanvas.width = window.innerWidth;
+		rippleCanvas.height = window.innerHeight;
+	};
+	window.addEventListener('resize', resizeRippleCanvas);
+	resizeRippleCanvas();
+
+	const chars = document.querySelectorAll('.title-char');
+	const waveCenterY = canvas.height / 2 - 30; // タイトルに近づけた基準位置
+
+	let wasHidden = false; // ★ 非表示からの切り替わり検知フラグ
+
+	const addTap = (e) => {
+		if (e && e.target && e.target.closest('button, a, input, select, [role="button"]')) {
+			return;
+		}
+
+		if (e) e.preventDefault();
+		let now = performance.now();
+		let clientX = e.touches
+			? e.touches[0].clientX
+			: e.clientX !== undefined
+				? e.clientX
+				: window.innerWidth / 2;
+		let clientY = e.touches
+			? e.touches[0].clientY
+			: e.clientY !== undefined
+				? e.clientY
+				: window.innerHeight / 2;
+
+		const tBase = typeof T_base !== 'undefined' ? T_base : 2400;
+
+		if (homeLastTapTime !== 0) {
+			let dtTap = now - homeLastTapTime;
+			if (dtTap >= tBase * 1.5) {
+				homeFreqMultiplier = 1.0;
+				homeTapIntervals = [];
+			} else {
+				homeTapIntervals.push(dtTap);
+				if (homeTapIntervals.length > 3) homeTapIntervals.shift();
+				let avgInterval = homeTapIntervals.reduce((a, b) => a + b, 0) / homeTapIntervals.length;
+				avgInterval = Math.max(avgInterval, tBase / 8.0);
+				homeFreqMultiplier = tBase / avgInterval;
+			}
+		}
+		homeLastTapTime = now;
+
+		let step = typeof tapAmplitudeStep !== 'undefined' ? tapAmplitudeStep : 0.75;
+		let maxAmp = typeof maxPlayerAmplitude !== 'undefined' ? maxPlayerAmplitude : 1.5;
+
+		homePlayerTarget.amplitude = Math.min(homePlayerTarget.amplitude + step, maxAmp);
+
+		const baseOmega = (2 * Math.PI) / (tBase / 1000);
+		homePlayerTarget.omega = baseOmega * homeFreqMultiplier;
+
+		homeRipples.push({ x: clientX, y: clientY, radius: 0, alpha: 0.6 });
+	};
+
+	document.addEventListener('mousedown', addTap);
+	document.addEventListener('touchstart', addTap, { passive: false });
+
+	function drawHome() {
+		requestAnimationFrame(drawHome);
+
+		const homeScreen = document.getElementById('home-screen');
+		const isHidden = homeScreen && homeScreen.style.display === 'none';
+
+		// 非表示中（ゲーム画面表示中など）
+		if (isHidden) {
+			wasHidden = true; // 次回表示時にリセットするためのフラグを設定
+			lastHomeTime = performance.now();
+			return;
+		}
+
+		// ★ ホーム画面に戻ってきた瞬間のリセット処理
+		if (wasHidden) {
+			resetHomeWave();
+			wasHidden = false;
+		}
+
+		let now = performance.now();
+		let dt = now - lastHomeTime;
+		lastHomeTime = now;
+
+		if (dt > 100 || dt < 0) dt = 16;
+		let dt_sec = dt / 1000;
+
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		rippleCtx.clearRect(0, 0, rippleCanvas.width, rippleCanvas.height);
+
+		if (!cachedTitleColor && chars.length > 0) {
+			cachedTitleColor = window.getComputedStyle(chars[0]).color;
+		}
+		const waveColor = cachedTitleColor || 'rgba(255, 255, 255, 0.85)';
+
+		const speed = typeof targetSpeed !== 'undefined' ? targetSpeed : 400;
+		const tBase = typeof T_base !== 'undefined' ? T_base : 2400;
+		const baseOmega = (2 * Math.PI) / (tBase / 1000);
+
+		homePlayerOffset += dt_sec * speed;
+
+		// 減衰・消失判定
+		let expectedInterval = ((2 * Math.PI) / homePlayerTarget.omega) * 1000;
+		let timeSinceLastTap = now - homeLastTapTime;
+		let isTapping = homeLastTapTime !== 0 && timeSinceLastTap <= expectedInterval * 1.5 + 150;
+
+		let omegaRatio = homeFreqMultiplier;
+		let targetDecayRate = isTapping ? 0.1 * omegaRatio : 0.2 + 2 * omegaRatio;
+
+		homeCurrentDecayRate += (targetDecayRate - homeCurrentDecayRate) * (dt_sec * 5.0);
+		homePlayerTarget.amplitude -= homeCurrentDecayRate * dt_sec;
+
+		if (homePlayerTarget.amplitude <= 0) {
+			homePlayerTarget.amplitude = 0;
+			homeFreqMultiplier = 1.0;
+			homeTapIntervals = [];
+		}
+
+		homePlayerTarget.omega = baseOmega * homeFreqMultiplier;
+
+		// 波バッファの生成
+		let t_right = (canvas.width + 100 + homePlayerOffset) / speed;
+		const dt_step = 1 / speed;
+
+		if (homeGenerator.lastT === 0) {
+			homeGenerator.lastT = homePlayerOffset / speed;
+		}
+
+		while (homeGenerator.lastT < t_right) {
+			homeGenerator.lastT += dt_step;
+
+			let omegaAccel = (homePlayerTarget.omega - homeGenerator.omega) * 0.02;
+			homeGenerator.omegaVel += omegaAccel;
+			homeGenerator.omegaVel *= 0.75;
+			homeGenerator.omega += homeGenerator.omegaVel;
+			homeGenerator.phi += homeGenerator.omega * dt_step;
+
+			let ampAccel = (homePlayerTarget.amplitude - homeGenerator.amplitude) * 0.03;
+			homeGenerator.ampVel += ampAccel;
+			homeGenerator.ampVel *= 0.65;
+			homeGenerator.amplitude += homeGenerator.ampVel;
+			if (homeGenerator.amplitude < 0) homeGenerator.amplitude = 0;
+
+			let baseY = 2 * Math.cos(homeGenerator.phi);
+			let y = homeGenerator.amplitude * baseY;
+
+			homeWaveBuffer.push({
+				t: homeGenerator.lastT,
+				y: y,
+				baseY: baseY,
+			});
+		}
+
+		let t_left = (-100 + homePlayerOffset) / speed;
+		let removeCount = 0;
+		while (homeWaveBuffer.length > removeCount && homeWaveBuffer[removeCount].t < t_left) {
+			removeCount++;
+		}
+		if (removeCount > 0) {
+			homeWaveBuffer.splice(0, removeCount);
+		}
+
+		// 1. 波紋描画
+		for (let i = homeRipples.length - 1; i >= 0; i--) {
+			let r = homeRipples[i];
+			rippleCtx.save();
+			rippleCtx.beginPath();
+			rippleCtx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+			rippleCtx.strokeStyle = waveColor;
+			rippleCtx.globalAlpha = r.alpha;
+			rippleCtx.lineWidth = 2;
+			rippleCtx.stroke();
+			rippleCtx.restore();
+
+			r.radius += dt * 0.2;
+			r.alpha -= dt / 800;
+			if (r.alpha <= 0) homeRipples.splice(i, 1);
+		}
+
+		// 2. 波の描画
+		const baseAmp = 15;
+		let pts = [];
+
+		for (let i = 0; i < homeWaveBuffer.length; i += 2) {
+			let p = homeWaveBuffer[i];
+			let x = p.t * speed - homePlayerOffset;
+
+			if (x >= -20 && x <= canvas.width + 20) {
+				let py = waveCenterY - (p.y / 2) * baseAmp;
+				let d2 = typeof enablePeakEmphasis !== 'undefined' && enablePeakEmphasis ? -p.baseY : 0;
+				pts.push({ x: x, py: py, d2: d2 });
+			}
+		}
+
+		let colorFunc = () => waveColor;
+
+		if (typeof drawEmphasizedLine === 'function') {
+			let thick = typeof lineThickness !== 'undefined' ? lineThickness + 0.5 : 3.0;
+			drawEmphasizedLine(
+				ctx,
+				pts,
+				thick,
+				colorFunc,
+				typeof enablePeakEmphasis !== 'undefined' ? enablePeakEmphasis : true,
+			);
+		} else {
+			ctx.beginPath();
+			ctx.lineWidth = 3;
+			ctx.strokeStyle = waveColor;
+			for (let i = 0; i < pts.length; i++) {
+				if (i === 0) ctx.moveTo(pts[i].x, pts[i].py);
+				else ctx.lineTo(pts[i].x, pts[i].py);
+			}
+			ctx.stroke();
+		}
+
+		// 3. タイトル文字のアニメーション
+		if (chars.length > 0 && homeWaveBuffer.length > 0) {
+			const startX = canvas.width / 2 - 120;
+			const charSpacing = 30;
+			const firstWorldX = homeWaveBuffer[0].t * speed;
+
+			chars.forEach((span, i) => {
+				let charX = startX + i * charSpacing;
+				if (span.classList.contains('version')) {
+					charX += 50;
+				}
+
+				let worldX = charX + homePlayerOffset;
+				let idx = Math.round(worldX - firstWorldX);
+
+				if (idx >= 0 && idx < homeWaveBuffer.length) {
+					let y = homeWaveBuffer[idx].y / 2;
+					span.style.transform = `translateY(${-y * 6}px)`;
+				}
+			});
+		}
+	}
+
+	requestAnimationFrame(drawHome);
+}
+
+// ホーム画面の波ループを起動
+initHomeWave();
+
 initGame();
 requestAnimationFrame(draw);
 
@@ -1914,10 +2274,52 @@ if (nextButton) {
 }
 
 // ==========================================
-// ★ 追加: ホーム画面に戻る処理
+// ★ 修正: ホーム画面に戻る処理 (表示切替)
 // ==========================================
 window.goHome = function () {
-	window.location.href = 'index.html';
+	// ホーム画面を表示する
+	document.getElementById('home-screen').style.display = 'flex';
+
+	// クリア画面のボタン群が開いていたら隠す
+	const clearBtns = document.getElementById('clear-buttons-container');
+	if (clearBtns) {
+		clearBtns.style.display = 'none';
+	}
+	isClearButtonsShown = false;
+
+	// 裏でゲームが動き続けないように一時停止にする
+	if (!isPaused) {
+		togglePause();
+	}
+};
+
+// ==========================================
+// ★ 修正: ゲームスタート処理 (モード引数を追加)
+// ==========================================
+window.startGame = function (mode) {
+	console.log('選択されたモード:', mode);
+
+	// ★ 受け取った mode を保存（マッピング定義があれば日本語名に、なければそのまま設定）
+	currentGameMode = modeNames[mode] || mode;
+
+	// ※ 今後ここでモードごとの設定（波の数 N の変更やスピード調整など）を分岐させることができます。
+	// 例: if (mode === 'easy') { targetSpeed = 300; N = 3; } など
+
+	// ホーム画面を隠す
+	document.getElementById('home-screen').style.display = 'none';
+
+	// ホーム画面で設定メニュー（ui-container）を開いたままスタートした場合は閉じる
+	if (isSettingsOpen) {
+		toggleSettings();
+	}
+
+	// 一時停止状態なら解除する
+	if (isPaused) {
+		togglePause();
+	}
+
+	// ゲームを初期化して開始
+	initGame();
 };
 
 // ==========================================

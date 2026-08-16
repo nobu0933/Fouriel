@@ -106,7 +106,7 @@ html {
 	border-radius: 12px;
 	padding: 15px;
 	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-	z-index: 20;
+	z-index: 250;
 
 	/* 初期状態では非表示 */
 	display: none;
@@ -303,4 +303,155 @@ input:checked + .toggle-slider {
 /* チェックが入ったときのツマミの移動 */
 input:checked + .toggle-slider:before {
 	transform: translateX(20px);
+}
+
+/* ==========================================
+   ★ 追加: ホーム画面のスタイル
+========================================== */
+#home-screen {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	background-color: #f4f9ff; /* 背景色に合わせる */
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 200; /* 全てのUIの上に表示 */
+}
+
+.home-content {
+	text-align: center;
+}
+
+/* ==========================================
+   ★ 修正・追加: ホーム画面内の各要素のスタイル
+========================================== */
+.home-content h1 {
+	font-size: 64px;
+	color: #4b6c8f;
+	margin-bottom: 10px;
+	letter-spacing: 2px;
+	/* ★ バージョン表記を横並び・下揃えにするための設定 */
+	display: flex;
+	align-items: baseline;
+	justify-content: center;
+	gap: 15px;
+}
+
+/* ★ 追加: バージョン表記のスタイル */
+.version {
+	font-size: 20px;
+	color: #82a5c9;
+	font-weight: normal;
+	letter-spacing: normal;
+}
+
+.home-content p {
+	font-size: 18px;
+	color: #4a5d73;
+	margin-bottom: 40px;
+}
+
+/* ★ 追加: 右上の設定ボタン (ホーム画面用) */
+#home-settings-btn {
+	position: absolute;
+	top: 20px;
+	right: 20px;
+	width: 44px;
+	height: 44px;
+	border-radius: 8px;
+	background-color: rgba(255, 255, 255, 0.85);
+	border: 1px solid #dbe9f5;
+	font-size: 20px;
+	color: #4a5d73;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 4px 12px rgba(96, 156, 217, 0.2);
+	transition: all 0.2s ease;
+	z-index: 210; /* ui-containerなどが上に被らないように高く設定 */
+}
+
+#home-settings-btn:hover {
+	background-color: #ffffff;
+	transform: translateY(-2px);
+}
+
+/* ★ 追加: モード選択ボタン群のレイアウト */
+.mode-selection {
+	display: flex;
+	flex-direction: column; /* 縦に並べる */
+	gap: 15px;
+	align-items: center;
+}
+
+/* モードボタンの共通スタイル */
+.mode-btn {
+	width: 260px;
+	padding: 15px 0;
+	font-size: 20px;
+	font-weight: bold;
+	color: #ffffff;
+	border: none;
+	border-radius: 12px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.mode-btn:active {
+	transform: translateY(0) !important;
+}
+
+/* チュートリアルボタン (青系) */
+.tutorial-btn {
+	background-color: #82a5c9;
+	box-shadow: 0 4px 12px rgba(130, 165, 201, 0.4);
+}
+.tutorial-btn:hover {
+	background-color: #6a8eb3;
+	transform: translateY(-2px);
+	box-shadow: 0 6px 16px rgba(130, 165, 201, 0.5);
+}
+
+/* イージーボタン (緑系) */
+.easy-btn {
+	background-color: #48b884;
+	box-shadow: 0 4px 12px rgba(72, 184, 132, 0.4);
+}
+.easy-btn:hover {
+	background-color: #3da072;
+	transform: translateY(-2px);
+	box-shadow: 0 6px 16px rgba(72, 184, 132, 0.5);
+}
+
+/* ハードボタン (赤系) */
+.hard-btn {
+	background-color: #e66e6e;
+	box-shadow: 0 4px 12px rgba(230, 110, 110, 0.4);
+}
+.hard-btn:hover {
+	background-color: #c95b5b;
+	transform: translateY(-2px);
+	box-shadow: 0 6px 16px rgba(230, 110, 110, 0.5);
+}
+
+/* ==========================================
+   ★ 追加: ホーム画面のタイトルアニメーションと波キャンバス
+========================================== */
+.title-char {
+	display: inline-block;
+	/* transform（上下の動き）を滑らかに反映させます */
+	will-change: transform;
+}
+
+#homeWaveCanvas {
+	width: 100%;
+	max-width: 800px;
+	height: 100px;
+	margin: -30px auto 20px;
+	display: block;
+	cursor: pointer;
 }

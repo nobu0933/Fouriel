@@ -10,6 +10,44 @@
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
+		<!-- ★ 修正: ホーム画面のコンテナ -->
+		<div id="home-screen">
+			<!-- ★ 追加: 右上の設定ボタン -->
+			<button id="home-settings-btn" onclick="toggleSettings()">
+				<i id="homeSettingsIcon" class="fa-solid fa-gear"></i>
+				<!-- ★ id="homeSettingsIcon" を追加 -->
+			</button>
+
+			<div class="home-content">
+				<!-- ★ 修正: 文字を動かせるように分割し、キャンバスを追加 -->
+				<h1 id="home-title">
+					<div style="display: flex">
+						<span class="title-char">F</span>
+						<span class="title-char">O</span>
+						<span class="title-char">U</span>
+						<span class="title-char">R</span>
+						<span class="title-char">I</span>
+						<span class="title-char">E</span>
+						<span class="title-char">L</span>
+					</div>
+					<span class="version title-char" style="margin-left: 15px">beta. 1.0</span>
+				</h1>
+
+				<canvas id="homeWaveCanvas"></canvas>
+
+				<!-- <p>波のリズムに合わせてタップしよう！</p> -->
+
+				<!-- ★ 修正: 3つのモード選択ボタンに変更 -->
+				<div class="mode-selection">
+					<button class="mode-btn tutorial-btn" onclick="startGame('tutorial')">
+						チュートリアル
+					</button>
+					<button class="mode-btn easy-btn" onclick="startGame('easy')">イージー</button>
+					<button class="mode-btn hard-btn" onclick="startGame('hard')">ハード</button>
+				</div>
+			</div>
+		</div>
+
 		<div id="app-container">
 			<canvas id="gameCanvas"></canvas>
 
@@ -21,7 +59,7 @@
 				style="
 					display: none;
 					position: absolute;
-					top: 38%; /* ★ 65% から 45% に変更（波のすぐ下） */
+					top: 40%; /* ★ 65% から 45% に変更（波のすぐ下） */
 					left: 50%;
 					transform: translate(-50%, -50%);
 					gap: 30px; /* ★ ボタン同士の間隔も少し広げると見栄えが良くなります */
@@ -129,63 +167,76 @@
 
 				<hr style="width: 100%; border: 0; border-top: 1px solid #dbe9f5; margin: 5px 0" />
 
-				<!-- ★ 修正: 各スライダーに id を追加し、onchange 等で saveSettings を呼ぶ -->
-				<label
-					>進行速度:
+				<!-- ★ 修正: Gridレイアウトを使ってスライダーを整列 / 行間は小さめ(row-gap: 6px) -->
+				<div
+					style="
+						display: grid;
+						grid-template-columns: auto 1fr;
+						row-gap: 6px;
+						column-gap: 15px;
+						align-items: center;
+					"
+				>
+					<label for="speedSlider">波の速さ</label>
 					<input
 						type="range"
 						id="speedSlider"
-						min="50"
-						max="800"
-						value="300"
+						min="200"
+						max="600"
+						step="100"
+						value="400"
 						oninput="setWaveSpeed(this.value)"
 						onchange="saveSettings()"
-				/></label>
-				<label
-					>線の太さ:
+					/>
+
+					<label for="lineThicknessSlider">線の太さ</label>
 					<input
 						type="range"
 						id="lineThicknessSlider"
-						min="0.5"
-						max="10"
-						step="0.5"
+						min="1.5"
+						max="5.5"
+						step="1.0"
 						value="2.5"
 						oninput="setLineThickness(this.value)"
 						onchange="saveSettings()"
-				/></label>
-				<label
-					>円の間隔:
+					/>
+
+					<label for="dotSpacingSlider">円の間隔</label>
 					<input
 						type="range"
 						id="dotSpacingSlider"
-						min="4"
+						min="20"
 						max="100"
-						value="12"
+						step="20"
+						value="60"
 						oninput="setDotSpacing(this.value)"
 						onchange="saveSettings()"
-				/></label>
-				<label
-					>円の半径:
+					/>
+
+					<label for="dotRadiusSlider">円の半径</label>
 					<input
 						type="range"
 						id="dotRadiusSlider"
-						min="1"
-						max="10"
-						value="4"
+						min="4"
+						max="12"
+						step="2"
+						value="8"
 						oninput="setDotRadius(this.value)"
 						onchange="saveSettings()"
-				/></label>
-				<label
-					>濃い円の間隔:
+					/>
+
+					<label for="dotAccentIntervalSlider">濃い円の間隔</label>
 					<input
 						type="range"
 						id="dotAccentIntervalSlider"
-						min="1"
-						max="20"
-						value="5"
+						min="2"
+						max="10"
+						step="2"
+						value="6"
 						oninput="setDotAccentInterval(this.value)"
 						onchange="saveSettings()"
-				/></label>
+					/>
+				</div>
 
 				<hr style="width: 100%; border: 0; border-top: 1px solid #dbe9f5; margin: 5px 0" />
 
